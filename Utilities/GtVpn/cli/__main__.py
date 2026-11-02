@@ -2,8 +2,10 @@ import argparse
 import os
 import pathlib
 import plistlib
+import random
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -51,8 +53,8 @@ def wait_exit(pid, seconds):
     return not alive(pid)
 
 
-def stop_idle_preventers():
-    sudo("pkill", "-f", "^vpn-slice --prevent-idle-timeout", capture_output=True)
+def stop_watchers():
+    sudo("pkill", "-f", "^(vpn-slice --prevent-idle-timeout|gtvpn watch )", capture_output=True)
 
 
 def running(profile):
@@ -130,11 +132,11 @@ def cmd_setup(args):
 
 
 def slice_arguments(profile):
-    arguments = []
+    arguments = ["--no-fork"]
     if profile.verbose:
         arguments.append("-v")
     if profile.keepalive.dns_probe:
-        arguments.append("-K")
+        arguments.append("--keepalive")
     if profile.dns_domains:
         arguments += ["--domains-vpn-dns", ",".join(profile.dns_domains)]
     return arguments + list(profile.routes)
@@ -162,7 +164,7 @@ def cmd_connect(args):
         die("no saved password; run: gtvpn setup")
     if sudo("-n", "true", capture_output=True).returncode != 0:
         sudo("-v", check=True)
-    stop_idle_preventers()
+    stop_watchers()
     print("Connecting to %s as %s. Approve the Duo push on your phone." % (profile.gateway, profile.username))
     notify("Approve the Duo push on your phone to connect.")
     command = [
@@ -203,7 +205,7 @@ def cmd_disconnect(args):
     if not wait_exit(pid, 5):
         die("openconnect (pid %d) did not exit" % pid)
     sudo("rm", "-f", profile.pid_file)
-    stop_idle_preventers()
+    stop_watchers()
     print("Disconnected.")
     notify("Disconnected from the GT VPN.")
 
@@ -252,8 +254,66 @@ def resolve_domains(domains):
     subprocess.run(["resolvectl", "domain", device, *["~" + domain for domain in domains]])
 
 
+def tunnel_up(device):
+    try:
+        socket.if_nametoindex(device)
+    except OSError:
+        return False
+    return True
+
+
+def next_probe(interval):
+    return time.monotonic() + random.randint(2 * interval // 3, 9 * interval // 10)
+
+
+def probe(servers, address):
+    import dns.exception
+    import dns.resolver
+    import dns.reversename
+
+    server = random.choice(servers)
+    resolver = dns.resolver.Resolver(configure=False)
+    resolver.nameservers = [server]
+    try:
+        resolver.resolve(dns.reversename.from_address(server), "PTR", lifetime=5, source=address)
+    except (dns.exception.DNSException, OSError):
+        pass
+
+
+def detach(title):
+    if os.fork():
+        return False
+    os.setsid()
+    os.dup2(os.open(os.devnull, os.O_RDONLY), 0)
+    os.closerange(3, max(int(name) for name in os.listdir("/dev/fd")) + 1)
+    from setproctitle import setproctitle
+
+    setproctitle(title)
+    return True
+
+
+def watch(arguments, keepalive):
+    from vpn_slice.__main__ import main
+
+    device = os.environ["TUNDEV"]
+    servers = os.environ.get("INTERNAL_IP4_DNS", "").split()
+    address = os.environ.get("INTERNAL_IP4_ADDRESS")
+    interval = int(os.environ.get("IDLE_TIMEOUT") or 600)
+    due = next_probe(interval)
+    while tunnel_up(device):
+        if keepalive and servers and time.monotonic() >= due:
+            probe(servers, address)
+            due = next_probe(interval)
+        time.sleep(2)
+    print("gtvpn: %s is gone; removing its routes, hosts and DNS" % device, file=sys.stderr)
+    main(arguments, environ=dict(os.environ, reason="disconnect"))
+
+
 def cmd_slice(args):
     arguments = list(args.arguments)
+    keepalive = "--keepalive" in arguments
+    if keepalive:
+        arguments.remove("--keepalive")
     if profiles.system() == "linux" and "--domains-vpn-dns" in arguments:
         index = arguments.index("--domains-vpn-dns")
         domains = arguments[index + 1].split(",")
@@ -263,6 +323,11 @@ def cmd_slice(args):
     from vpn_slice.__main__ import main
 
     main(arguments)
+    if os.environ.get("reason") == "connect" and detach("gtvpn watch " + os.environ["TUNDEV"]):
+        try:
+            watch(arguments, keepalive)
+        finally:
+            os._exit(0)
 
 
 def version():

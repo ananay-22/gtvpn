@@ -1,4 +1,5 @@
 import pathlib
+import socket
 import tempfile
 import unittest
 
@@ -35,8 +36,13 @@ class ProfileTest(unittest.TestCase):
         profile.dns_domains.extend(["a.example.org", "b.example.org"])
         script = cli.slice_script(profile)
         self.assertIn("GTVPN_CACHE=" + profile.cache_dir, script)
-        self.assertIn(" slice -v -K --domains-vpn-dns a.example.org,b.example.org 128.61.0.0/16 ", script)
+        self.assertIn(" slice --no-fork -v --keepalive --domains-vpn-dns a.example.org,b.example.org 128.61.0.0/16 ", script)
         self.assertTrue(script.endswith(" >>/var/log/gtvpn.log 2>&1"))
+
+
+    def test_tunnel_up_follows_the_interface(self):
+        self.assertTrue(cli.tunnel_up(socket.if_nameindex()[0][1]))
+        self.assertFalse(cli.tunnel_up("gtvpn-none"))
 
 
 if __name__ == "__main__":

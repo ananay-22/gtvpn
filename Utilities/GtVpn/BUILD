@@ -31,7 +31,7 @@ py_app(
         "@platforms//os:macos": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.5.1",
+    version = "0.5.2",
     deps = [":cli"],
 )
 
