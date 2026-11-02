@@ -1,4 +1,7 @@
-module(name = "gtvpn")
+module(
+    name = "gtvpn",
+    version = "0.5.0",
+)
 
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
@@ -49,6 +52,12 @@ sysroot_archive(
     version = "bullseye",
 )
 
+sysroot_archive(
+    name = "sysroot_linux_aarch64",
+    arch = "aarch64",
+    version = "bullseye",
+)
+
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.toolchain(
     name = "llvm_linux_x86_64",
@@ -63,9 +72,25 @@ llvm.sysroot(
     label = "@sysroot_linux_x86_64//:sysroot",
     targets = ["linux-x86_64"],
 )
-use_repo(llvm, "llvm_linux_x86_64")
+llvm.toolchain(
+    name = "llvm_linux_aarch64",
+    cxx_standard = {"": "c++20"},
+    exec_arch = "aarch64",
+    exec_os = "linux",
+    llvm_version = "19.1.7",
+    stdlib = {"": "builtin-libc++"},
+)
+llvm.sysroot(
+    name = "llvm_linux_aarch64",
+    label = "@sysroot_linux_aarch64//:sysroot",
+    targets = ["linux-aarch64"],
+)
+use_repo(llvm, "llvm_linux_aarch64", "llvm_linux_x86_64")
 
-register_toolchains("//Toolchains/Linux:linux_x86_64")
+register_toolchains(
+    "//Toolchains/Linux:linux_aarch64",
+    "//Toolchains/Linux:linux_x86_64",
+)
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 

@@ -1,6 +1,7 @@
 import argparse
 import os
 import pathlib
+import plistlib
 import shlex
 import shutil
 import subprocess
@@ -50,6 +51,10 @@ def wait_exit(pid, seconds):
     return not alive(pid)
 
 
+def stop_idle_preventers():
+    sudo("pkill", "-f", "^vpn-slice --prevent-idle-timeout", capture_output=True)
+
+
 def running(profile):
     try:
         pid = int(pathlib.Path(profile.pid_file).read_text().strip())
@@ -92,7 +97,7 @@ def install(profile):
         "cp -R %s %s" % (q(str(APP)), q(str(staged))),
         "printf '%%s\\n' %s > %s" % (q(payload()), q(str(staged / ".payload"))),
         "chown -R 0:0 %s" % q(str(staged)),
-        "chmod -R go-w %s" % q(str(staged)),
+        "chmod -R a+rX,go-w %s" % q(str(staged)),
         "rm -rf %s" % q(str(target / "app")),
         "mv %s %s" % (q(str(staged)), q(str(target / "app"))),
         "install -m 0755 %s %s" % (q(str(OPENCONNECT)), q(str(target / "openconnect"))),
@@ -157,6 +162,7 @@ def cmd_connect(args):
         die("no saved password; run: gtvpn setup")
     if sudo("-n", "true", capture_output=True).returncode != 0:
         sudo("-v", check=True)
+    stop_idle_preventers()
     print("Connecting to %s as %s. Approve the Duo push on your phone." % (profile.gateway, profile.username))
     notify("Approve the Duo push on your phone to connect.")
     command = [
@@ -197,6 +203,7 @@ def cmd_disconnect(args):
     if not wait_exit(pid, 5):
         die("openconnect (pid %d) did not exit" % pid)
     sudo("rm", "-f", profile.pid_file)
+    stop_idle_preventers()
     print("Disconnected.")
     notify("Disconnected from the GT VPN.")
 
@@ -258,8 +265,13 @@ def cmd_slice(args):
     main(arguments)
 
 
+def version():
+    with open(APP / "Contents" / "Info.plist", "rb") as handle:
+        return plistlib.load(handle)["CFBundleShortVersionString"]
+
+
 def cmd_version(args):
-    print("gtvpn %s" % payload()[:12])
+    print("gtvpn %s (%s)" % (version(), payload()[:12]))
 
 
 COMMANDS = {
