@@ -1,0 +1,42 @@
+name: build
+
+on:
+  push:
+    branches: [export]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            artifact: gtvpn-linux-x86_64
+          - os: macos-15
+            artifact: gtvpn-macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: bazel test //Utilities/GtVpn:cli_test --test_output=errors
+      - run: bazel build //Utilities/GtVpn:gtvpn
+      - run: GTVPN_CACHE="$RUNNER_TEMP/cache" ./bazel-bin/Utilities/GtVpn/gtvpn version
+      - run: tar -czf "$RUNNER_TEMP/${{ matrix.artifact }}.tar.gz" -C bazel-bin/Utilities/GtVpn gtvpn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ runner.temp }}/${{ matrix.artifact }}.tar.gz
+
+  promote:
+    needs: build
+    if: github.ref == 'refs/heads/export'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git push origin HEAD:main
