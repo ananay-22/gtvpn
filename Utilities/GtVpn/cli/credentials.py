@@ -49,9 +49,18 @@ def _keyring_read(collection, profile):
     return None
 
 
+def _unlock_keychain():
+    if subprocess.run(["security", "show-keychain-info"], capture_output=True).returncode == 0:
+        return
+    print("Your login keychain is locked; enter your Mac login password to unlock it.")
+    if subprocess.run(["security", "unlock-keychain"]).returncode != 0:
+        raise SystemExit("gtvpn: could not unlock the login keychain")
+
+
 def store(profile):
     service = profile.keychain.service
     if profiles.system() == "macos":
+        _unlock_keychain()
         print("Enter your GT password when asked (twice).")
         subprocess.run(
             ["security", "add-generic-password", "-U", "-s", service, "-a", profile.username, "-l", profile.keychain.label, "-w"],
@@ -72,6 +81,7 @@ def store(profile):
 def read(profile):
     service = profile.keychain.service
     if profiles.system() == "macos":
+        _unlock_keychain()
         result = subprocess.run(
             ["security", "find-generic-password", "-s", service, "-a", profile.username, "-w"],
             capture_output=True,

@@ -117,12 +117,10 @@ def cmd_setup(args):
     user = profiles.load_user()
     merged = profiles.load()
     user.username = ask("GT username (e.g. gburdell3)", merged.username)
-    user.gateway = ask("VPN gateway host", merged.gateway)
-    domains = ask("Domains to resolve through the VPN, comma separated (blank for none)", ",".join(merged.dns_domains))
-    del user.dns_domains[:]
-    user.dns_domains.extend([domain.strip() for domain in domains.split(",") if domain.strip()])
-    if not user.username or not user.gateway:
-        die("a username and a gateway are both needed")
+    user.ClearField("gateway")
+    user.ClearField("dns_domains")
+    if not user.username:
+        die("a GT username is needed")
     profiles.save_user(user)
     merged = profiles.load()
     where = credentials.store(merged)
@@ -149,23 +147,8 @@ def slice_script(profile):
     return " ".join(command) + " >>%s 2>&1" % q(profile.log_file)
 
 
-def cmd_connect(args):
-    profile = profiles.load()
-    pid = running(profile)
-    if pid:
-        print("Already connected (pid %d)." % pid)
-        return
-    if not profile.username or not profile.gateway:
-        die("not set up yet; run: gtvpn setup")
-    if not installed(profile):
-        die("the VPN helpers are missing or from another build; run: gtvpn setup")
-    password = credentials.read(profile)
-    if password is None:
-        die("no saved password; run: gtvpn setup")
-    if sudo("-n", "true", capture_output=True).returncode != 0:
-        sudo("-v", check=True)
-    stop_watchers()
-    print("Connecting to %s as %s. Approve the Duo push on your phone." % (profile.gateway, profile.username))
+def connect_gateway(profile, gateway, password):
+    print("Connecting to %s as %s. Approve the Duo push on your phone." % (gateway, profile.username))
     notify("Approve the Duo push on your phone to connect.")
     command = [
         str(pathlib.Path(profile.install_dir) / "openconnect"),
@@ -176,19 +159,45 @@ def cmd_connect(args):
         "--passwd-on-stdin",
         "--background",
         "--pid-file=" + profile.pid_file,
-        profile.gateway,
+        gateway,
     ]
     result = sudo(*command, input="%s\n%s\n" % (password, profile.mfa.auto_response), text=True)
-    del password
-    pid = None
+    if result.returncode != 0:
+        return None
     for _ in range(10):
         pid = running(profile)
         if pid:
-            break
+            return pid
         time.sleep(1)
-    if result.returncode != 0 or not pid:
+    return None
+
+
+def cmd_connect(args):
+    profile = profiles.load()
+    pid = running(profile)
+    if pid:
+        print("Already connected (pid %d)." % pid)
+        return
+    if not profile.username:
+        die("not set up yet; run: gtvpn setup")
+    if not installed(profile):
+        die("the VPN helpers are missing or from another build; run: gtvpn setup")
+    password = credentials.read(profile)
+    if password is None:
+        die("no saved password; run: gtvpn setup")
+    if sudo("-n", "true", capture_output=True).returncode != 0:
+        sudo("-v", check=True)
+    stop_watchers()
+    pid = None
+    for gateway in profile.gateway:
+        pid = connect_gateway(profile, gateway, password)
+        if pid:
+            break
+        print("gtvpn: could not connect to %s" % gateway, file=sys.stderr)
+    del password
+    if not pid:
         die("connection failed; see the messages above")
-    print("Connected (pid %d)." % pid)
+    print("Connected to %s (pid %d)." % (gateway, pid))
     notify("Connected to the GT VPN.")
 
 
@@ -210,18 +219,24 @@ def cmd_disconnect(args):
     notify("Disconnected from the GT VPN.")
 
 
+def watched():
+    output = subprocess.run(["ps", "axo", "args="], capture_output=True, text=True).stdout
+    return {line.split()[2] for line in output.splitlines() if line.startswith("gtvpn watch ")}
+
+
 def tunnels():
+    devices = watched()
     if profiles.system() == "macos":
         output = subprocess.run(["ifconfig"], capture_output=True, text=True).stdout
         found, interface = [], None
         for line in output.splitlines():
             if line and not line[0].isspace():
                 interface = line.split(":")[0]
-            elif interface and interface.startswith("utun") and line.strip().startswith("inet "):
+            elif interface in devices and line.strip().startswith("inet "):
                 found.append("%s %s" % (interface, line.split()[1]))
         return found
     output = subprocess.run(["ip", "-o", "-4", "addr", "show"], capture_output=True, text=True).stdout
-    return ["%s %s" % (fields[1], fields[3]) for fields in (line.split() for line in output.splitlines()) if fields[1].startswith("tun")]
+    return ["%s %s" % (fields[1], fields[3]) for fields in (line.split() for line in output.splitlines()) if fields[1] in devices]
 
 
 def cmd_status(args):
@@ -230,7 +245,8 @@ def cmd_status(args):
     if not pid:
         print("Not connected.")
         return
-    print("Connected to %s (pid %d)." % (profile.gateway, pid) if profile.gateway else "Connected (pid %d)." % pid)
+    gateway = subprocess.run(["ps", "-o", "args=", "-p", str(pid)], capture_output=True, text=True).stdout.split()
+    print("Connected to %s (pid %d)." % (gateway[-1], pid) if gateway else "Connected (pid %d)." % pid)
     for tunnel in tunnels():
         print("  " + tunnel)
 

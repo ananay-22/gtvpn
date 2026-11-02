@@ -17,22 +17,25 @@ class ProfileTest(unittest.TestCase):
             self.assertTrue(profile.routes)
             for field in ("pid_file", "log_file", "install_dir", "cache_dir", "command_dir"):
                 self.assertTrue(getattr(profile, field).startswith("/"), (system, field))
-            self.assertFalse(profile.gateway)
-            self.assertFalse(profile.dns_domains)
+            self.assertEqual(list(profile.gateway), ["dc-ext-gw.vpn.gatech.edu", "ni-ext-gw.vpn.gatech.edu"])
+            self.assertEqual(list(profile.dns_domains), ["gatech.edu"])
+            self.assertFalse(profile.username)
 
     def test_user_fields_replace_defaults_and_keep_the_rest(self):
-        user = profile_pb2.Profile(gateway="gw.example.org", username="someone", routes=["10.1.0.0/16"])
+        user = profile_pb2.Profile(gateway=["gw.example.org"], username="someone", routes=["10.1.0.0/16"])
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "Profile.pbtxt"
             profiles.save_user(user, path)
             merged = profiles.load(path)
         self.assertEqual(list(merged.routes), ["10.1.0.0/16"])
-        self.assertEqual(merged.gateway, "gw.example.org")
+        self.assertEqual(list(merged.gateway), ["gw.example.org"])
+        self.assertEqual(list(merged.dns_domains), ["gatech.edu"])
         self.assertEqual(merged.protocol, "gp")
         self.assertEqual(merged.mfa.auto_response, "1")
 
     def test_slice_script_quotes_and_logs(self):
         profile = profiles.load(pathlib.Path("/nonexistent"))
+        del profile.dns_domains[:]
         profile.dns_domains.extend(["a.example.org", "b.example.org"])
         script = cli.slice_script(profile)
         self.assertIn("GTVPN_CACHE=" + profile.cache_dir, script)

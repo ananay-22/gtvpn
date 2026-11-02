@@ -4,6 +4,7 @@ routes: "128.61.0.0/16"
 routes: "130.207.0.0/16"
 routes: "143.215.0.0/16"
 routes: "10.0.0.0/8"
+dns_domains: "gatech.edu"
 keepalive {
   dns_probe: true
 }
@@ -15,6 +16,8 @@ keychain {
   service: "gtvpn"
   label: "GT VPN"
 }
+gateway: "dc-ext-gw.vpn.gatech.edu"
+gateway: "ni-ext-gw.vpn.gatech.edu"
 pid_file: "/run/gtvpn.pid"
 log_file: "/var/log/gtvpn.log"
 install_dir: "/usr/local/libexec/gtvpn"
