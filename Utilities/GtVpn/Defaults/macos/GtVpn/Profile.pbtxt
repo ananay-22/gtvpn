@@ -1,0 +1,22 @@
+protocol: "gp"
+usergroup: "gateway"
+routes: "128.61.0.0/16"
+routes: "130.207.0.0/16"
+routes: "143.215.0.0/16"
+routes: "10.0.0.0/8"
+keepalive {
+  dns_probe: true
+}
+verbose: true
+mfa {
+  auto_response: "1"
+}
+keychain {
+  service: "gtvpn"
+  label: "GT VPN"
+}
+pid_file: "/var/run/gtvpn.pid"
+log_file: "/var/log/gtvpn.log"
+install_dir: "/usr/local/libexec/gtvpn"
+cache_dir: "/Library/Caches/GtVpn"
+command_dir: "/usr/local/bin"

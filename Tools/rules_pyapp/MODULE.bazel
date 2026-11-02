@@ -1,0 +1,24 @@
+module(
+    name = "pyapp",
+    version = "0.1.0",
+    compatibility_level = 1,
+)
+
+bazel_dep(name = "multi_platforms", version = "0.1.0")
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "rules_python", version = "0.34.0", repo_name = "rules_python_bzlmod")
+
+pyapp = use_extension("//:extensions.bzl", "pyapp")
+use_repo(
+    pyapp,
+    "pyapp_static_3_10",
+    "pyapp_static_3_11",
+    "pyapp_static_3_12",
+    "pyapp_static_3_13",
+    "pyapp_static_3_14",
+    "pyapp_uv_linux_aarch64",
+    "pyapp_uv_linux_x86_64",
+    "pyapp_uv_macos_arm64",
+    "pyapp_uv_macos_x86_64",
+    "pyapp_uv_windows_x86_64",
+)

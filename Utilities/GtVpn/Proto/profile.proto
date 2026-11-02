@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package gtvpn;
+
+message Keepalive {
+  optional bool dns_probe = 1;
+}
+
+message Mfa {
+  optional string auto_response = 1;
+}
+
+message Keychain {
+  optional string service = 1;
+  optional string label = 2;
+}
+
+message Profile {
+  optional string protocol = 1;
+  optional string usergroup = 2;
+  repeated string routes = 3;
+  repeated string dns_domains = 4;
+  Keepalive keepalive = 5;
+  optional bool verbose = 6;
+  Mfa mfa = 7;
+  Keychain keychain = 8;
+  reserved 9;
+  optional string pid_file = 10;
+  optional string gateway = 11;
+  optional string username = 12;
+  optional string log_file = 13;
+  optional string install_dir = 14;
+  optional string cache_dir = 15;
+  optional string command_dir = 16;
+}

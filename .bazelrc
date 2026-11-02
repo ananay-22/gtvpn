@@ -1,0 +1,7 @@
+common --enable_bzlmod
+
+build -c opt
+build --incompatible_enable_proto_toolchain_resolution
+build --incompatible_strict_action_env
+build --macos_minimum_os=11.0
+build --host_macos_minimum_os=11.0
