@@ -8,11 +8,27 @@ Build:
 bazel build //Utilities/GtVpn:gtvpn
 ```
 
-Run:
+Install:
 
 ```bash
 ./bazel-bin/Utilities/GtVpn/gtvpn setup
+```
+
+Run:
+
+```bash
 gtvpn connect
 ```
+
+Commands:
+
+| Command | Does |
+|---|---|
+| `gtvpn setup` | Asks for your GT username, the VPN gateway and the domains to resolve through the VPN, saves your password in the macOS Keychain or the Linux login keyring (`~/.config/gtvpn/password` without one), and installs `gtvpn` into `/usr/local/bin` |
+| `gtvpn connect` (`up`, `on`) | Connects and sends a Duo push; only GT networks go through the VPN |
+| `gtvpn disconnect` (`down`, `off`) | Logs off and removes the VPN routes |
+| `gtvpn status` | Shows whether the VPN is up and its tunnel addresses (the default command) |
+| `gtvpn log` | Shows the last 50 lines of the VPN log |
+| `gtvpn version` | Shows the version and build |
 
 Maintained by Nana Gupta <ananay@gatech.edu>.

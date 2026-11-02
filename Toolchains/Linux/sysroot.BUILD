@@ -6,6 +6,7 @@ filegroup(
         "usr/include/**",
         "usr/local/include/**",
         "lib/*-linux-gnu*/**",
+        "lib/ld-linux-*",
         "lib64/**",
         "usr/lib/*-linux-gnu*/**",
         "usr/lib/gcc/**",
