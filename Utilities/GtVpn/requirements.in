@@ -1,2 +1,3 @@
 protobuf==6.31.1
+secretstorage==3.5.0 ; sys_platform == "linux"
 vpn-slice==0.16.1

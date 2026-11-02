@@ -14,6 +14,8 @@ Install:
 ./bazel-bin/Utilities/GtVpn/gtvpn setup
 ```
 
+On Linux, split DNS needs systemd-resolved.
+
 Run:
 
 ```bash
@@ -24,7 +26,7 @@ Commands:
 
 | Command | Does |
 |---|---|
-| `gtvpn setup` | Asks for your GT username, the VPN gateway and the domains to resolve through the VPN, saves your password in the macOS Keychain or the Linux login keyring (`~/.config/gtvpn/password` without one), and installs `gtvpn` into `/usr/local/bin` |
+| `gtvpn setup` | Asks for your GT username, the VPN gateway and the domains to resolve through the VPN, saves your password in the macOS Keychain or the Linux login keyring (`~/.config/gtvpn/password` when no keyring is running), and installs `gtvpn` into `/usr/local/bin` |
 | `gtvpn connect` (`up`, `on`) | Connects and sends a Duo push; only GT networks go through the VPN |
 | `gtvpn disconnect` (`down`, `off`) | Logs off and removes the VPN routes |
 | `gtvpn status` | Shows whether the VPN is up and its tunnel addresses (the default command) |
